@@ -35,6 +35,19 @@ reads  7d ▁▁▁▁▁█▂ 8/24h · last 25m ago
 
 Redraws every 5s and on resize. Keys: `q` quit, `r` refresh now.
 
+## Always running (login autostart)
+
+`relate-glance.command` is a double-clickable launcher that opens the TUI in a
+Terminal window, restarts it if it crashes, and stays quit after a clean `q`.
+Add it to **System Settings → General → Login Items** (or:
+`osascript -e 'tell application "System Events" to make login item at end with
+properties {path:"<repo>/relate-glance.command", hidden:false}'`) and a glance
+window appears at every login.
+
+relate itself needs no autostart: it's an embedded database — this app (and
+every MCP host) opens the store directly per query, and the `relate serve`
+processes are spawned by Claude Desktop/Code on their own launch.
+
 Env overrides: `RELATE_BIN` (default `~/.local/bin/relate`), `RELATE_DB`
 (default `~/.relate/memory`).
 
