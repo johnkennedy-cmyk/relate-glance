@@ -21,6 +21,11 @@ processes use, so it never blocks or corrupts writers.
 - **Health/growth:** node/relationship counts, on-disk size, 7-day cumulative
   sparkline of episodes + facts (computed from their timestamps — the app
   persists nothing).
+- **Reads served:** MCP tool calls against the store (reads-24h tile + per-day
+  bars), scraped best-effort from the hosts' MCP logs: Claude Code's
+  `~/Library/Caches/claude-cli-nodejs/*/mcp-logs-relate-memory/*.jsonl` and
+  Claude Desktop's `~/Library/Logs/Claude/mcp-server-relate-memory.log`. A host
+  that doesn't log tool calls won't be counted.
 
 ## Run
 
