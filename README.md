@@ -11,7 +11,7 @@ the live MCP processes use, so it never blocks or corrupts writers.
 writes 7d ▁▁▁▁▁▆█ 294 (+16)
 reads  7d ▁▁▁▁▁█▂ 8/24h · last 25m ago
 ────────────────────────────────────────
-11/11 18:00 FACT relate v1.0.0 graph mem…
+11/11 18:00 FACT prefers dark mode in al…
 11/11 11:03 EP   debugged the retry loop…
 ```
 
@@ -52,6 +52,20 @@ processes are spawned by Claude Desktop/Code on their own launch.
 
 Env overrides: `RELATE_BIN` (default `~/.local/bin/relate`), `RELATE_DB`
 (default `~/.relate/memory`).
+
+## `relate run glance` (extension)
+
+`extension/glance/` is a relate [command
+extension](https://github.com/relatedb/relate/tree/main/docs/api/extensions):
+a one-line, read-only stats summary inside the relate CLI itself. The full
+TUI can't be an extension (extension stdin/stdout are the MCP wire), so the
+extension is the companion entry point:
+
+```sh
+relate extension install glance --github johnkennedy-cmyk/relate-glance@v0.1.0
+relate run glance -d ~/.relate/memory
+# glance: 330 Entity · 202 Episode · 92 Fact · 1011 rels · last write …
+```
 
 ## Requirements
 

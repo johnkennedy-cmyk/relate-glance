@@ -1,0 +1,9 @@
+{
+  "kind": "command",
+  "name": "glance",
+  "version": "0.1.0",
+  "protocol": "2025-06-18",
+  "flags": [],
+  "commit": "per-batch",
+  "executable": "glance.ts"
+}
