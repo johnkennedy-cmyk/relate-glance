@@ -17,6 +17,8 @@ reads  7d ▁▁▁▁▁█▂ 8/24h · last 25m ago
 
 - **Glance:** live dot (write in last 10 min), "last write Xs ago", feed of the
   newest episodes and facts (fills whatever height the terminal has).
+- **Memory:** summed RSS of the relate processes holding the live graph, as a
+  % of total RAM, plus free-ish system memory (free+inactive+purgeable).
 - **Health/growth:** node/relationship counts, on-disk size, 7-day cumulative
   sparkline of episodes + facts (computed from their timestamps — the app
   persists nothing).

@@ -70,6 +70,16 @@ function buildFrame(s: Snapshot, cols: number, rows: number): string {
       `${C.reset}${C.bold}${mb}${C.reset}${C.grey} MB${C.reset}`,
   );
 
+  if (s.mem.totalKB > 0) {
+    const gb = (kb: number) => (kb / 1048576).toFixed(1);
+    const relMB = (s.mem.relateKB / 1024).toFixed(0);
+    const relPct = ((s.mem.relateKB / s.mem.totalKB) * 100).toFixed(2);
+    lines.push(
+      `${C.grey}mem    relate ${C.reset}${C.bold}${relMB} MB${C.reset}${C.grey} · ${relPct}% of ${gb(s.mem.totalKB)} GB · ` +
+        `${gb(s.mem.freeKB)} GB free${C.reset}`,
+    );
+  }
+
   const total = s.growth[s.growth.length - 1]?.cum ?? 0;
   const delta = total - (s.growth[0]?.cum ?? 0);
   lines.push(`${C.grey}writes 7d ${C.blue}${spark(s.growth.map((d) => d.cum))}${C.reset} ${total}${C.grey} (+${delta})${C.reset}`);

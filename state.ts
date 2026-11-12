@@ -57,6 +57,28 @@ async function readTraffic(sinceMs: number): Promise<number[]> {
   return stamps;
 }
 
+// System memory view: summed RSS of relate processes (the serve/query
+// processes holding the live graph), total RAM, and free-ish memory.
+async function systemMem() {
+  // Best-effort and macOS-specific (vm_stat, hw.memsize); on other platforms
+  // this returns zeros and the TUI hides the line rather than erroring.
+  const [psOut, totalOut, vmOut] = await Promise.all([
+    run(["ps", "-axo", "rss=,args="]).catch(() => ""),
+    run(["sysctl", "-n", "hw.memsize"]).catch(() => "0"),
+    run(["vm_stat"]).catch(() => ""),
+  ]);
+  let relateKB = 0;
+  for (const line of psOut.split("\n")) {
+    const m = line.trim().match(/^(\d+)\s+(.*)$/);
+    if (m && m[2].includes(RELATE_BIN)) relateKB += Number(m[1]);
+  }
+  const pageSize = Number(vmOut.match(/page size of (\d+) bytes/)?.[1] ?? 16384);
+  const pages = (name: string) => Number(vmOut.match(new RegExp(`${name}:\\s+(\\d+)`))?.[1] ?? 0);
+  // ponytail: free+inactive+purgeable ≈ macOS "available"; close enough for a glance
+  const freeKB = ((pages("Pages free") + pages("Pages inactive") + pages("Pages purgeable")) * pageSize) / 1024;
+  return { relateKB, totalKB: Number(totalOut.trim()) / 1024, freeKB };
+}
+
 export type Snapshot = Awaited<ReturnType<typeof snapshot>>;
 
 export async function snapshot() {
@@ -76,7 +98,7 @@ export async function snapshot() {
     cypher(`MATCH (f:Fact) WHERE f.recordedAt >= datetime("${windowStart}") RETURN left(toString(f.recordedAt),10) AS day, count(*) AS c`),
     run(["du", "-sk", RELATE_DB]).catch(() => "0"),
   ]);
-  const readStamps = await readTraffic(Date.parse(windowStart));
+  const [readStamps, mem] = await Promise.all([readTraffic(Date.parse(windowStart)), systemMem()]);
 
   const byLabel: Record<string, number> = {};
   for (const row of counts) byLabel[row.l] = row.c;
@@ -125,6 +147,7 @@ export async function snapshot() {
       rels: rels[0]?.c ?? 0,
     },
     sizeKB: Number(String(du).trim().split(/\s+/)[0] || 0),
+    mem,
     lastWrite: events[0]?.at ?? null,
     growth: days,
     reads: { perDay: reads, last24h: reads24h, lastRead },
