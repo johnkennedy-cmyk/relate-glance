@@ -1,12 +1,9 @@
-// relate-glance: tiny read-only dashboard over a relate memory store.
-// Zero deps. Run with: bun server.ts
+// relate-glance data layer: read-only snapshot of a relate memory store.
 declare const Bun: any;
 
 const HOME = process.env.HOME ?? "";
 const RELATE_BIN = process.env.RELATE_BIN ?? `${HOME}/.local/bin/relate`;
 const RELATE_DB = process.env.RELATE_DB ?? `${HOME}/.relate/memory`;
-const PORT = Number(process.env.PORT ?? 7877);
-const POLL_CACHE_MS = 4000;
 
 async function run(cmd: string[]): Promise<string> {
   const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
@@ -60,7 +57,9 @@ async function readTraffic(sinceMs: number): Promise<number[]> {
   return stamps;
 }
 
-async function snapshot() {
+export type Snapshot = Awaited<ReturnType<typeof snapshot>>;
+
+export async function snapshot() {
   // relate one-shot output is capped at 100 rows, so never SELECT whole tables:
   // feed uses LIMIT, growth uses per-day aggregation (<=8 rows).
   // 7 calendar-day window: today plus the 6 prior days.
@@ -68,10 +67,10 @@ async function snapshot() {
   const [counts, rels, episodes, facts, epDays, factDays, du] = await Promise.all([
     cypher("MATCH (n) RETURN labels(n)[0] AS l, count(n) AS c"),
     cypher("MATCH ()-[r]->() RETURN count(r) AS c"),
-    cypher("MATCH (e:Episode) RETURN e.at AS at, e.kind AS kind, e.text AS text ORDER BY at DESC LIMIT 15"),
+    cypher("MATCH (e:Episode) RETURN e.at AS at, e.kind AS kind, e.text AS text ORDER BY at DESC LIMIT 40"),
     cypher(
       "MATCH (f:Fact) OPTIONAL MATCH (f)-[:ABOUT]->(en:Entity) WITH f, collect(en.name) AS about " +
-        "RETURN f.recordedAt AS at, f.slot AS slot, coalesce(f.text, f.body) AS text, about ORDER BY at DESC LIMIT 15",
+        "RETURN f.recordedAt AS at, f.slot AS slot, coalesce(f.text, f.body) AS text, about ORDER BY at DESC LIMIT 40",
     ),
     cypher(`MATCH (e:Episode) WHERE e.at >= datetime("${windowStart}") RETURN left(toString(e.at),10) AS day, count(*) AS c`),
     cypher(`MATCH (f:Fact) WHERE f.recordedAt >= datetime("${windowStart}") RETURN left(toString(f.recordedAt),10) AS day, count(*) AS c`),
@@ -129,45 +128,7 @@ async function snapshot() {
     lastWrite: events[0]?.at ?? null,
     growth: days,
     reads: { perDay: reads, last24h: reads24h, lastRead },
-    feed: events.slice(0, 15).map((e) => ({ ...e, text: e.text.length > 110 ? e.text.slice(0, 110) + "…" : e.text })),
+    // ponytail: 40 rows fills any sane glance terminal; taller than ~45 rows pads short
+    feed: events.slice(0, 40).map((e) => ({ ...e, text: e.text.length > 200 ? e.text.slice(0, 200) + "…" : e.text })),
   };
 }
-
-let cache: { at: number; body: string } | null = null;
-let inflight: Promise<string> | null = null;
-
-async function cachedState(): Promise<string> {
-  if (cache && Date.now() - cache.at <= POLL_CACHE_MS) return cache.body;
-  // Coalesce concurrent refreshes into one subprocess batch.
-  inflight ??= (async () => {
-    try {
-      const body = JSON.stringify(await snapshot());
-      cache = { at: Date.now(), body };
-      return body;
-    } finally {
-      inflight = null;
-    }
-  })();
-  return inflight;
-}
-
-const INDEX = await Bun.file(new URL("./index.html", import.meta.url).pathname).text();
-
-Bun.serve({
-  port: PORT,
-  hostname: "127.0.0.1",
-  async fetch(req: Request) {
-    const path = new URL(req.url).pathname;
-    if (path === "/api/state") {
-      try {
-        return new Response(await cachedState(), { headers: { "content-type": "application/json" } });
-      } catch (err) {
-        return Response.json({ error: String(err) }, { status: 500 });
-      }
-    }
-    if (path === "/") return new Response(INDEX, { headers: { "content-type": "text/html" } });
-    return new Response("not found", { status: 404 });
-  },
-});
-
-console.log(`relate-glance on http://localhost:${PORT} (store: ${RELATE_DB}, read-only)`);
